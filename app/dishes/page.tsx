@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,9 @@ import {
   MoreVertical,
   Power,
   PowerOff,
-  Trash2
+  Trash2,
+  Upload,
+  X
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -35,13 +37,84 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 
+// 压缩图片到指定大小以下（256KB）
+async function compressImage(file: File, maxSizeKB: number = 256): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new window.Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+        
+        // 最大尺寸限制（防止图片过大）
+        const MAX_WIDTH = 1200
+        const MAX_HEIGHT = 1200
+        
+        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+          if (width / height > MAX_WIDTH / MAX_HEIGHT) {
+            height = Math.round(height * MAX_WIDTH / width)
+            width = MAX_WIDTH
+          } else {
+            width = Math.round(width * MAX_HEIGHT / height)
+            height = MAX_HEIGHT
+          }
+        }
+        
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('无法创建 canvas context'))
+          return
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height)
+        
+        // 尝试不同的质量来压缩到目标大小
+        let quality = 0.9
+        let base64 = canvas.toDataURL('image/jpeg', quality)
+        
+        // 计算 base64 大小（约等于原始大小的 4/3）
+        const getBase64Size = (base64Str: string) => {
+          const base64Length = base64Str.split(',')[1].length
+          return (base64Length * 3) / 4 / 1024 // KB
+        }
+        
+        // 如果还是太大，降低质量
+        while (getBase64Size(base64) > maxSizeKB && quality > 0.1) {
+          quality -= 0.1
+          base64 = canvas.toDataURL('image/jpeg', quality)
+        }
+        
+        // 如果质量已经很低还是太大，进一步缩小尺寸
+        if (getBase64Size(base64) > maxSizeKB) {
+          const scale = 0.8
+          canvas.width = width * scale
+          canvas.height = height * scale
+          ctx.drawImage(img, 0, 0, width * scale, height * scale)
+          base64 = canvas.toDataURL('image/jpeg', 0.7)
+        }
+        
+        resolve(base64)
+      }
+      img.onerror = reject
+      img.src = e.target?.result as string
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function DishesPage() {
   const [dishes, setDishes] = useState<Dish[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [newDish, setNewDish] = useState({ title: '', description: '', images: [] as string[] })
-  const [imageUrl, setImageUrl] = useState('')
+  const [isCompressing, setIsCompressing] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
   const fetchDishes = useCallback(async () => {
@@ -72,10 +145,34 @@ export default function DishesPage() {
     fetchDishes()
   }, [router, fetchDishes])
 
-  const handleAddImage = () => {
-    if (imageUrl.trim() && newDish.images.length < 5) {
-      setNewDish(prev => ({ ...prev, images: [...prev.images, imageUrl.trim()] }))
-      setImageUrl('')
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    if (newDish.images.length >= 5) {
+      alert('最多只能上传5张图片')
+      return
+    }
+    
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件')
+      return
+    }
+    
+    setIsCompressing(true)
+    try {
+      const compressedBase64 = await compressImage(file, 256)
+      setNewDish(prev => ({ ...prev, images: [...prev.images, compressedBase64] }))
+    } catch (error) {
+      alert('图片压缩失败，请重试')
+      console.error('压缩失败:', error)
+    } finally {
+      setIsCompressing(false)
+      // 清空 input 以便可以再次选择同一文件
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
   }
 
@@ -101,6 +198,8 @@ export default function DishesPage() {
       setAddDialogOpen(false)
       setNewDish({ title: '', description: '', images: [] })
       fetchDishes()
+    } else {
+      alert('上架失败：' + error.message)
     }
   }
 
@@ -303,47 +402,74 @@ export default function DishesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>图片链接（最多5张）</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="粘贴图片URL"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddImage()}
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={handleAddImage}
-                  disabled={newDish.images.length >= 5}
-                >
-                  添加
-                </Button>
-              </div>
+              <Label>图片（最多5张，每张自动压缩至256KB以内）</Label>
               
+              {/* 隐藏的文件输入 */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*"
+                className="hidden"
+              />
+              
+              {/* 上传按钮 */}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-24 border-dashed"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={newDish.images.length >= 5 || isCompressing}
+              >
+                {isCompressing ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                    <span className="text-sm text-muted-foreground">压缩中...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <Upload className="w-6 h-6 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      {newDish.images.length >= 5 ? '已达到上限' : '点击选择图片'}
+                    </span>
+                  </div>
+                )}
+              </Button>
+              
+              {/* 图片预览 */}
               {newDish.images.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {newDish.images.map((url, index) => (
+                <div className="flex flex-wrap gap-3 mt-3">
+                  {newDish.images.map((base64, index) => (
                     <div key={index} className="relative group">
-                      <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted">
+                      <div className="w-24 h-24 rounded-lg overflow-hidden bg-muted border">
                         <Image
-                          src={url}
+                          src={base64}
                           alt={`图片${index + 1}`}
-                          width={80}
-                          height={80}
+                          width={96}
+                          height={96}
                           className="object-cover w-full h-full"
                         />
                       </div>
                       <button
+                        type="button"
                         onClick={() => handleRemoveImage(index)}
-                        className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                       >
-                        ×
+                        <X className="w-3 h-3" />
                       </button>
+                      <div className="absolute bottom-1 left-1 right-1 text-center">
+                        <span className="text-[10px] bg-black/50 text-white px-1.5 py-0.5 rounded">
+                          {Math.round((base64.length * 3) / 4 / 1024)}KB
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
+              
+              <p className="text-xs text-muted-foreground">
+                已上传 {newDish.images.length}/5 张
+              </p>
             </div>
           </div>
 
@@ -354,7 +480,7 @@ export default function DishesPage() {
             <Button 
               className="flex-1 bg-primary" 
               onClick={handleAddDish}
-              disabled={!newDish.title.trim()}
+              disabled={!newDish.title.trim() || isCompressing}
             >
               上架菜品
             </Button>

@@ -27,13 +27,14 @@ export function Numpad({ onSubmit, onCancel, maxLength = 6, title = '输入密�
   const handleSubmit = () => {
     if (code.length === maxLength) {
       onSubmit(code)
+      setCode('') // 提交后清空
     }
   }
 
   const numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'delete']
 
   return (
-    <div className="flex flex-col items-center gap-6 p-6">
+    <div className="flex flex-col items-center gap-6 p-4">
       <h3 className="text-lg font-medium text-foreground">{title}</h3>
       
       {/* 密码显示 */}
@@ -59,6 +60,7 @@ export function Numpad({ onSubmit, onCancel, maxLength = 6, title = '输入密�
             return (
               <Button
                 key={index}
+                type="button"
                 variant="outline"
                 size="icon"
                 className="w-16 h-16 rounded-2xl text-xl"
@@ -73,6 +75,7 @@ export function Numpad({ onSubmit, onCancel, maxLength = 6, title = '输入密�
           return (
             <Button
               key={index}
+              type="button"
               variant="outline"
               className="w-16 h-16 rounded-2xl text-xl font-medium hover:bg-primary/10 hover:border-primary/50 transition-all active:scale-95"
               onClick={() => handleNumber(num)}
@@ -88,6 +91,7 @@ export function Numpad({ onSubmit, onCancel, maxLength = 6, title = '输入密�
       <div className="flex gap-3 w-full">
         {onCancel && (
           <Button
+            type="button"
             variant="outline"
             className="flex-1 h-12 rounded-xl"
             onClick={onCancel}
@@ -96,6 +100,7 @@ export function Numpad({ onSubmit, onCancel, maxLength = 6, title = '输入密�
           </Button>
         )}
         <Button
+          type="button"
           className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary/90"
           onClick={handleSubmit}
           disabled={code.length !== maxLength}

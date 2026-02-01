@@ -12,6 +12,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash)
 }
 
+// 使用 encodeURIComponent 支持 Unicode 字符
 export function generateToken(user: User): string {
   const token = JSON.stringify({
     id: user.id,
@@ -19,12 +20,14 @@ export function generateToken(user: User): string {
     role: user.role,
     exp: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30天过期
   })
-  return btoa(token)
+  // 使用 encodeURIComponent 处理 Unicode 字符，然后再 base64 编码
+  return btoa(encodeURIComponent(token))
 }
 
 export function verifyToken(token: string): { id: string; nickname: string; role: 'chef' | 'diner' } | null {
   try {
-    const decoded = JSON.parse(atob(token))
+    // 先 base64 解码，再 decodeURIComponent 还原 Unicode
+    const decoded = JSON.parse(decodeURIComponent(atob(token)))
     if (decoded.exp < Date.now()) return null
     return decoded
   } catch {

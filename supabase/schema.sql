@@ -1,7 +1,7 @@
 -- 干饭厨子数据库结构
 
 -- 用户表
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   nickname TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE users (
 );
 
 -- 菜品表
-CREATE TABLE dishes (
+CREATE TABLE IF NOT EXISTS dishes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT,
@@ -22,7 +22,7 @@ CREATE TABLE dishes (
 );
 
 -- 饭局表
-CREATE TABLE dinners (
+CREATE TABLE IF NOT EXISTS dinners (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
   dining_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE dinners (
 );
 
 -- 点菜记录表
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   dinner_id UUID NOT NULL REFERENCES dinners(id) ON DELETE CASCADE,
   dish_id UUID NOT NULL REFERENCES dishes(id) ON DELETE CASCADE,
@@ -44,7 +44,7 @@ CREATE TABLE orders (
 );
 
 -- 评价表
-CREATE TABLE reviews (
+CREATE TABLE IF NOT EXISTS reviews (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   dinner_id UUID NOT NULL REFERENCES dinners(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -55,14 +55,23 @@ CREATE TABLE reviews (
 );
 
 -- 创建索引
-CREATE INDEX idx_dishes_status ON dishes(status);
-CREATE INDEX idx_dishes_created_by ON dishes(created_by);
-CREATE INDEX idx_dinners_status ON dinners(status);
-CREATE INDEX idx_dinners_created_by ON dinners(created_by);
-CREATE INDEX idx_orders_dinner_id ON orders(dinner_id);
-CREATE INDEX idx_orders_user_id ON orders(user_id);
-CREATE INDEX idx_reviews_dinner_id ON reviews(dinner_id);
+CREATE INDEX IF NOT EXISTS idx_dishes_status ON dishes(status);
+CREATE INDEX IF NOT EXISTS idx_dishes_created_by ON dishes(created_by);
+CREATE INDEX IF NOT EXISTS idx_dinners_status ON dinners(status);
+CREATE INDEX IF NOT EXISTS idx_dinners_created_by ON dinners(created_by);
+CREATE INDEX IF NOT EXISTS idx_orders_dinner_id ON orders(dinner_id);
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_dinner_id ON reviews(dinner_id);
 
+-- 禁用RLS（简化开发，生产环境建议开启）
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE dishes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE dinners DISABLE ROW LEVEL SECURITY;
+ALTER TABLE orders DISABLE ROW LEVEL SECURITY;
+ALTER TABLE reviews DISABLE ROW LEVEL SECURITY;
+
+-- 如果需要开启RLS，使用以下策略（需要配合认证）
+/*
 -- 启用RLS
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE dishes ENABLE ROW LEVEL SECURITY;
@@ -70,66 +79,44 @@ ALTER TABLE dinners ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 
--- RLS策略：用户表
-CREATE POLICY "允许所有人读取用户" ON users
-  FOR SELECT USING (true);
+-- 删除旧策略（如果存在）
+DROP POLICY IF EXISTS "允许所有人读取用户" ON users;
+DROP POLICY IF EXISTS "允许所有人创建用户" ON users;
+DROP POLICY IF EXISTS "允许厨子创建用户" ON users;
+DROP POLICY IF EXISTS "允许所有人读取菜品" ON dishes;
+DROP POLICY IF EXISTS "允许厨子管理菜品" ON dishes;
+DROP POLICY IF EXISTS "允许所有人读取饭局" ON dinners;
+DROP POLICY IF EXISTS "允许所有人创建饭局" ON dinners;
+DROP POLICY IF EXISTS "允许创建者或厨子修改饭局" ON dinners;
+DROP POLICY IF EXISTS "允许厨子删除饭局" ON dinners;
+DROP POLICY IF EXISTS "允许所有人读取点菜" ON orders;
+DROP POLICY IF EXISTS "允许认证用户点菜" ON orders;
+DROP POLICY IF EXISTS "允许用户取消自己的点菜" ON orders;
+DROP POLICY IF EXISTS "允许所有人读取评价" ON reviews;
+DROP POLICY IF EXISTS "允许认证用户创建评价" ON reviews;
+DROP POLICY IF EXISTS "允许用户修改自己的评价" ON reviews;
 
-CREATE POLICY "允许厨子创建用户" ON users
-  FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM users WHERE id = auth.uid() AND role = 'chef'
-    )
-  );
+-- RLS策略：用户表
+CREATE POLICY "允许所有人读取用户" ON users FOR SELECT USING (true);
+CREATE POLICY "允许所有人创建用户" ON users FOR INSERT WITH CHECK (true);
 
 -- RLS策略：菜品表
-CREATE POLICY "允许所有人读取菜品" ON dishes
-  FOR SELECT USING (true);
-
-CREATE POLICY "允许厨子管理菜品" ON dishes
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users WHERE id = auth.uid() AND role = 'chef'
-    )
-  );
+CREATE POLICY "允许所有人读取菜品" ON dishes FOR SELECT USING (true);
+CREATE POLICY "允许所有人管理菜品" ON dishes FOR ALL USING (true);
 
 -- RLS策略：饭局表
-CREATE POLICY "允许所有人读取饭局" ON dinners
-  FOR SELECT USING (true);
-
-CREATE POLICY "允许所有人创建饭局" ON dinners
-  FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "允许创建者或厨子修改饭局" ON dinners
-  FOR UPDATE USING (
-    created_by = auth.uid() OR
-    EXISTS (
-      SELECT 1 FROM users WHERE id = auth.uid() AND role = 'chef'
-    )
-  );
-
-CREATE POLICY "允许厨子删除饭局" ON dinners
-  FOR DELETE USING (
-    EXISTS (
-      SELECT 1 FROM users WHERE id = auth.uid() AND role = 'chef'
-    )
-  );
+CREATE POLICY "允许所有人读取饭局" ON dinners FOR SELECT USING (true);
+CREATE POLICY "允许所有人创建饭局" ON dinners FOR INSERT WITH CHECK (true);
+CREATE POLICY "允许所有人修改饭局" ON dinners FOR UPDATE USING (true);
+CREATE POLICY "允许所有人删除饭局" ON dinners FOR DELETE USING (true);
 
 -- RLS策略：点菜表
-CREATE POLICY "允许所有人读取点菜" ON orders
-  FOR SELECT USING (true);
-
-CREATE POLICY "允许认证用户点菜" ON orders
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "允许用户取消自己的点菜" ON orders
-  FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "允许所有人读取点菜" ON orders FOR SELECT USING (true);
+CREATE POLICY "允许所有人点菜" ON orders FOR INSERT WITH CHECK (true);
+CREATE POLICY "允许所有人取消点菜" ON orders FOR DELETE USING (true);
 
 -- RLS策略：评价表
-CREATE POLICY "允许所有人读取评价" ON reviews
-  FOR SELECT USING (true);
-
-CREATE POLICY "允许认证用户创建评价" ON reviews
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "允许用户修改自己的评价" ON reviews
-  FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "允许所有人读取评价" ON reviews FOR SELECT USING (true);
+CREATE POLICY "允许所有人创建评价" ON reviews FOR INSERT WITH CHECK (true);
+CREATE POLICY "允许所有人修改评价" ON reviews FOR UPDATE USING (true);
+*/
