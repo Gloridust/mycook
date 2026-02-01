@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { LoginDialog } from '@/components/auth/login-dialog'
 import { verifyToken } from '@/lib/auth'
@@ -13,7 +13,6 @@ import { motion } from 'framer-motion'
 export default function Home() {
   const [loginOpen, setLoginOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
-  const router = useRouter()
 
   const checkAuth = useCallback(() => {
     const token = localStorage.getItem('token')
@@ -41,10 +40,6 @@ export default function Home() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     setUser(null)
-  }
-
-  const navigateTo = (path: string) => {
-    router.push(path)
   }
 
   return (
@@ -110,38 +105,41 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="w-full max-w-sm space-y-4"
           >
-            <Button
-              size="lg"
-              className="w-full h-16 rounded-2xl text-lg bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
-              onClick={() => navigateTo('/dinners')}
-            >
-              <UtensilsCrossed className="w-5 h-5 mr-2" />
-              查看饭局
-              <ArrowRight className="w-5 h-5 ml-auto" />
-            </Button>
+            <Link href="/dinners" prefetch={false} className="block">
+              <Button
+                size="lg"
+                className="w-full h-16 rounded-2xl text-lg bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
+              >
+                <UtensilsCrossed className="w-5 h-5 mr-2" />
+                查看饭局
+                <ArrowRight className="w-5 h-5 ml-auto" />
+              </Button>
+            </Link>
             
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full h-16 rounded-2xl text-lg"
-              onClick={() => navigateTo('/dishes')}
-            >
-              <ChefHat className="w-5 h-5 mr-2" />
-              浏览菜品
-              <ArrowRight className="w-5 h-5 ml-auto" />
-            </Button>
-
-            {user.role === 'chef' && (
+            <Link href="/dishes" prefetch={false} className="block">
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full h-16 rounded-2xl text-lg border-primary/50 text-primary hover:bg-primary/10"
-                onClick={() => navigateTo('/profile')}
+                className="w-full h-16 rounded-2xl text-lg"
               >
                 <ChefHat className="w-5 h-5 mr-2" />
-                厨子后台
+                浏览菜品
                 <ArrowRight className="w-5 h-5 ml-auto" />
               </Button>
+            </Link>
+
+            {user.role === 'chef' && (
+              <Link href="/profile" prefetch={false} className="block">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full h-16 rounded-2xl text-lg border-primary/50 text-primary hover:bg-primary/10"
+                >
+                  <ChefHat className="w-5 h-5 mr-2" />
+                  厨子后台
+                  <ArrowRight className="w-5 h-5 ml-auto" />
+                </Button>
+              </Link>
             )}
           </motion.div>
         ) : (
