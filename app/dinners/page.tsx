@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { format } from '@/lib/utils'
+import { format, toISOStringWithTimezone } from '@/lib/utils'
 
 export default function DinnersPage() {
   const [dinners, setDinners] = useState<Dinner[]>([])
@@ -72,8 +72,8 @@ export default function DinnersPage() {
 
     const { error } = await supabase.from('dinners').insert({
       title: newDinner.title,
-      dining_time: newDinner.diningTime,
-      order_deadline: newDinner.orderDeadline,
+      dining_time: toISOStringWithTimezone(newDinner.diningTime),
+      order_deadline: toISOStringWithTimezone(newDinner.orderDeadline),
       allow_modify: true,
       created_by: user.id,
       status: 'active',
@@ -191,11 +191,11 @@ export default function DinnersPage() {
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-4 h-4" />
-                                <span>用餐：{format(new Date(dinner.dining_time), 'MM月dd日 HH:mm')}</span>
+                                <span>用餐：{format(dinner.dining_time, 'MM月dd日 HH:mm')}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Clock className="w-4 h-4" />
-                                <span>截止：{format(new Date(dinner.order_deadline), 'MM月dd日 HH:mm')}</span>
+                                <span>截止：{format(dinner.order_deadline, 'MM月dd日 HH:mm')}</span>
                               </div>
                             </div>
                           </div>

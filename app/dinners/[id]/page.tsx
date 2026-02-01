@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase, type Dish, type Dinner, type User, type Order, type Review } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
-import { 
+import {
   ArrowLeft, 
   ChefHat, 
   Clock,
@@ -20,7 +20,8 @@ import {
   Plus,
   Minus,
   Power,
-  Edit3
+  Edit3,
+  Filter
 } from 'lucide-react'
 
 import {
@@ -32,7 +33,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { format } from '@/lib/utils'
+import { format, toISOStringWithTimezone } from '@/lib/utils'
 
 interface OrderWithUser extends Order {
   user?: { nickname: string }
@@ -61,6 +62,7 @@ export default function DinnerDetailPage() {
     orderDeadline: ''
   })
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' })
+  const [showOnlyOrdered, setShowOnlyOrdered] = useState(false)
 
   const fetchData = useCallback(async () => {
     // 获取饭局信息
@@ -151,6 +153,10 @@ export default function DinnerDetailPage() {
     return orders.some(order => order.dish_id === dishId && order.user_id === user?.id)
   }
 
+  const isDishOrdered = (dishId: string) => {
+    return orders.some(order => order.dish_id === dishId)
+  }
+
   const handleOrder = async (dishId: string) => {
     if (!user || !canModifyOrder()) return
 
@@ -190,8 +196,8 @@ export default function DinnerDetailPage() {
       .from('dinners')
       .update({
         title: editedDinner.title,
-        dining_time: editedDinner.diningTime,
-        order_deadline: editedDinner.orderDeadline,
+        dining_time: toISOStringWithTimezone(editedDinner.diningTime),
+        order_deadline: toISOStringWithTimezone(editedDinner.orderDeadline),
       })
       .eq('id', dinnerId)
 
@@ -280,11 +286,11 @@ export default function DinnerDetailPage() {
         <div className="max-w-4xl mx-auto p-4 flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-1 text-muted-foreground">
             <Calendar className="w-4 h-4" />
-            <span>用餐：{format(new Date(dinner.dining_time), 'MM月dd日 HH:mm')}</span>
+            <span>用餐：{format(dinner.dining_time, 'MM月dd日 HH:mm')}</span>
           </div>
           <div className="flex items-center gap-1 text-muted-foreground">
             <Clock className="w-4 h-4" />
-            <span>截止：{format(new Date(dinner.order_deadline), 'MM月dd日 HH:mm')}</span>
+            <span>截止：{format(dinner.order_deadline, 'MM月dd日 HH:mm')}</span>
           </div>
         </div>
       </div>
@@ -300,6 +306,26 @@ export default function DinnerDetailPage() {
           </TabsList>
 
           <TabsContent value="order" className="space-y-4">
+            {/* 过滤器 */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={showOnlyOrdered ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowOnlyOrdered(!showOnlyOrdered)}
+                  className={showOnlyOrdered ? "bg-primary" : ""}
+                >
+                  <Filter className="w-4 h-4 mr-1" />
+                  {showOnlyOrdered ? "只看已点" : "全部菜品"}
+                </Button>
+                {showOnlyOrdered && (
+                  <span className="text-sm text-muted-foreground">
+                    已点 {dishes.filter(d => isDishOrdered(d.id)).length} 道菜
+                  </span>
+                )}
+              </div>
+            </div>
+
             {!canModifyOrder() && !deadlinePassed && (
               <div className="bg-muted rounded-lg p-3 text-sm text-center text-muted-foreground">
                 当前禁止修改点菜
@@ -319,67 +345,78 @@ export default function DinnerDetailPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {dishes.map((dish) => {
-                  const dishOrders = getDishOrders(dish.id)
-                  const ordered = hasOrdered(dish.id)
-                  const orderNames = dishOrders.map(o => o.user?.nickname || '').filter(Boolean)
+                {dishes.filter(dish => !showOnlyOrdered || isDishOrdered(dish.id)).length === 0 ? (
+                  <div className="col-span-full text-center py-12">
+                    <Filter className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">
+                      {showOnlyOrdered ? '还没有点任何菜' : '暂无可用菜品'}
+                    </p>
+                  </div>
+                ) : (
+                  dishes
+                    .filter(dish => !showOnlyOrdered || isDishOrdered(dish.id))
+                    .map((dish) => {
+                    const dishOrders = getDishOrders(dish.id)
+                    const ordered = hasOrdered(dish.id)
+                    const orderNames = dishOrders.map(o => o.user?.nickname || '').filter(Boolean)
 
-                  return (
-                    <Card key={dish.id} className={`overflow-hidden transition-all ${
-                      ordered ? 'ring-2 ring-primary' : ''
-                    }`}>
-                      <div className="relative h-40 bg-muted">
-                        {dish.images && dish.images.length > 0 ? (
-                          <Image
-                            src={dish.images[0]}
-                            alt={dish.title}
-                            fill
-                            className="object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ChefHat className="w-10 h-10 text-muted-foreground/30" />
-                          </div>
-                        )}
-                        
-                        {canModifyOrder() && (
-                          <Button
-                            size="sm"
-                            className={`absolute bottom-2 right-2 rounded-full ${
-                              ordered 
-                                ? 'bg-destructive hover:bg-destructive/90' 
-                                : 'bg-primary hover:bg-primary/90'
-                            }`}
-                            onClick={() => handleOrder(dish.id)}
-                          >
-                            {ordered ? (
-                              <><Minus className="w-4 h-4 mr-1" /> 取消</>
-                            ) : (
-                              <><Plus className="w-4 h-4 mr-1" /> 点菜</>
-                            )}
-                          </Button>
-                        )}
+                    return (
+                      <Card key={dish.id} className={`overflow-hidden transition-all ${
+                        ordered ? 'ring-2 ring-primary' : ''
+                      }`}>
+                        <div className="relative h-40 bg-muted">
+                          {dish.images && dish.images.length > 0 ? (
+                            <Image
+                              src={dish.images[0]}
+                              alt={dish.title}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ChefHat className="w-10 h-10 text-muted-foreground/30" />
+                            </div>
+                          )}
+                          
+                          {canModifyOrder() && (
+                            <Button
+                              size="sm"
+                              className={`absolute bottom-2 right-2 rounded-full ${
+                                ordered 
+                                  ? 'bg-destructive hover:bg-destructive/90' 
+                                  : 'bg-primary hover:bg-primary/90'
+                              }`}
+                              onClick={() => handleOrder(dish.id)}
+                            >
+                              {ordered ? (
+                                <><Minus className="w-4 h-4 mr-1" /> 取消</>
+                              ) : (
+                                <><Plus className="w-4 h-4 mr-1" /> 点菜</>
+                              )}
+                            </Button>
+                          )}
 
-                        {ordered && !canModifyOrder() && (
-                          <Badge className="absolute bottom-2 right-2 bg-primary">
-                            已点
-                          </Badge>
-                        )}
-                      </div>
+                          {ordered && !canModifyOrder() && (
+                            <Badge className="absolute bottom-2 right-2 bg-primary">
+                              已点
+                            </Badge>
+                          )}
+                        </div>
 
-                      <CardContent className="p-3">
-                        <h3 className="font-medium mb-1">{dish.title}</h3>
-                        
-                        {orderNames.length > 0 && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Users className="w-3 h-3" />
-                            <span>{orderNames.join('、')}点了</span>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )
-                })}
+                        <CardContent className="p-3">
+                          <h3 className="font-medium mb-1">{dish.title}</h3>
+                          
+                          {orderNames.length > 0 && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Users className="w-3 h-3" />
+                              <span>{orderNames.join('、')}点了</span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })
+                )}
               </div>
             )}
           </TabsContent>
