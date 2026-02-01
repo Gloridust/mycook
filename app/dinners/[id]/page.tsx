@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import Image from 'next/image'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import { supabase, type Dish, type Dinner, type User, type Order, type Review } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
 import {
-  ArrowLeft, 
-  ChefHat, 
+  ArrowLeft,
+  ChefHat,
   Clock,
   Calendar,
   Users,
@@ -41,6 +41,47 @@ interface OrderWithUser extends Order {
 
 interface ReviewWithUser extends Review {
   user?: { nickname: string }
+}
+
+// 懒加载图片组件
+function LazyImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [isInView, setIsInView] = useState(false)
+  const imgRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '50px' }
+    )
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={imgRef} className={`relative ${className}`}>
+      {!isLoaded && (
+        <Skeleton className="absolute inset-0" />
+      )}
+      {isInView && (
+        <img
+          src={src}
+          alt={alt}
+          className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setIsLoaded(true)}
+        />
+      )}
+    </div>
+  )
 }
 
 export default function DinnerDetailPage() {
@@ -378,11 +419,10 @@ export default function DinnerDetailPage() {
                       }`}>
                         <div className="relative h-40 bg-muted">
                           {dish.images && dish.images.length > 0 ? (
-                            <Image
+                            <LazyImage
                               src={dish.images[0]}
                               alt={dish.title}
-                              fill
-                              className="object-cover"
+                              className="w-full h-full"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">

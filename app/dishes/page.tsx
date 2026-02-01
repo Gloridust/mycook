@@ -1,17 +1,17 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { supabase, type Dish, type User } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
-import { 
-  ArrowLeft, 
-  Plus, 
-  ChefHat, 
+import {
+  ArrowLeft,
+  Plus,
+  ChefHat,
   ImageIcon,
   MoreVertical,
   Power,
@@ -37,6 +37,47 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+
+// 懒加载图片组件
+function LazyImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [isInView, setIsInView] = useState(false)
+  const imgRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '50px' }
+    )
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={imgRef} className={`relative ${className}`}>
+      {!isLoaded && (
+        <Skeleton className="absolute inset-0" />
+      )}
+      {isInView && (
+        <img
+          src={src}
+          alt={alt}
+          className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setIsLoaded(true)}
+        />
+      )}
+    </div>
+  )
+}
 
 // 压缩图片到指定大小以下（256KB）
 async function compressImage(file: File, maxSizeKB: number = 256): Promise<string> {
@@ -302,11 +343,10 @@ export default function DishesPage() {
                     {/* Image Gallery */}
                     <div className="relative h-48 bg-muted">
                       {dish.images && dish.images.length > 0 ? (
-                        <Image
+                        <LazyImage
                           src={dish.images[0]}
                           alt={dish.title}
-                          fill
-                          className="object-cover"
+                          className="w-full h-full"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -449,11 +489,9 @@ export default function DishesPage() {
                   {newDish.images.map((base64, index) => (
                     <div key={index} className="relative group">
                       <div className="w-24 h-24 rounded-lg overflow-hidden bg-muted border">
-                        <Image
+                        <img
                           src={base64}
                           alt={`图片${index + 1}`}
-                          width={96}
-                          height={96}
                           className="object-cover w-full h-full"
                         />
                       </div>
