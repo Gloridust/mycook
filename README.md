@@ -137,6 +137,42 @@ npm install
    ALTER TABLE reviews DISABLE ROW LEVEL SECURITY;
    ```
 
+### 🔄 重置数据库
+
+如果需要清空所有数据重新开始，在 Supabase Dashboard → SQL Editor 执行：
+
+```sql
+-- 重置数据库：删除所有数据但保留表结构
+-- 注意：此操作不可逆，请谨慎使用！
+
+-- 删除所有数据（按照外键依赖顺序）
+DELETE FROM reviews;
+DELETE FROM orders;
+DELETE FROM dinners;
+DELETE FROM dishes;
+DELETE FROM users;
+
+-- 重置序列（如果有自增ID）
+-- 注意：UUID 类型不需要重置序列
+
+-- 可选：删除表结构（完全重置）
+-- 警告：这将删除所有表，需要重新初始化！
+-- DROP TABLE IF EXISTS reviews CASCADE;
+-- DROP TABLE IF EXISTS orders CASCADE;
+-- DROP TABLE IF EXISTS dinners CASCADE;
+-- DROP TABLE IF EXISTS dishes CASCADE;
+-- DROP TABLE IF EXISTS users CASCADE;
+```
+
+> ⚠️ **警告**：重置操作会删除所有数据，包括：
+> - 所有用户信息（包括厨子账号）
+> - 所有菜品数据
+> - 所有饭局记录
+> - 所有点菜记录
+> - 所有评价数据
+>
+> 重置后首次访问系统时，需要重新创建厨子账号。
+
 ### 启动开发服务器
 
 ```bash
