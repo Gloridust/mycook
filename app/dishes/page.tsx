@@ -18,7 +18,8 @@ import {
   PowerOff,
   Trash2,
   Upload,
-  X
+  X,
+  Loader2
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -114,6 +115,7 @@ export default function DishesPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [newDish, setNewDish] = useState({ title: '', description: '', images: [] as string[] })
   const [isCompressing, setIsCompressing] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -184,22 +186,27 @@ export default function DishesPage() {
   }
 
   const handleAddDish = async () => {
-    if (!user || !newDish.title.trim()) return
+    if (!user || !newDish.title.trim() || isSubmitting) return
 
-    const { error } = await supabase.from('dishes').insert({
-      title: newDish.title,
-      description: newDish.description,
-      images: newDish.images,
-      status: 'active',
-      created_by: user.id,
-    })
+    setIsSubmitting(true)
+    try {
+      const { error } = await supabase.from('dishes').insert({
+        title: newDish.title,
+        description: newDish.description,
+        images: newDish.images,
+        status: 'active',
+        created_by: user.id,
+      })
 
-    if (!error) {
-      setAddDialogOpen(false)
-      setNewDish({ title: '', description: '', images: [] })
-      fetchDishes()
-    } else {
-      alert('上架失败：' + error.message)
+      if (!error) {
+        setAddDialogOpen(false)
+        setNewDish({ title: '', description: '', images: [] })
+        fetchDishes()
+      } else {
+        alert('上架失败：' + error.message)
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -474,15 +481,19 @@ export default function DishesPage() {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setAddDialogOpen(false)}>
+            <Button variant="outline" className="flex-1" onClick={() => setAddDialogOpen(false)} disabled={isSubmitting}>
               取消
             </Button>
             <Button 
               className="flex-1 bg-primary" 
               onClick={handleAddDish}
-              disabled={!newDish.title.trim() || isCompressing}
+              disabled={!newDish.title.trim() || isCompressing || isSubmitting}
             >
-              上架菜品
+              {isSubmitting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> 上架中...</>
+              ) : (
+                '上架菜品'
+              )}
             </Button>
           </div>
         </DialogContent>

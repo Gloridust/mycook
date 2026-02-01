@@ -16,7 +16,8 @@ import {
   Trash2,
   Users,
   LogOut,
-  Crown
+  Crown,
+  Loader2
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
@@ -36,6 +37,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false)
   const [newUser, setNewUser] = useState({ nickname: '', role: 'diner' as 'chef' | 'diner' })
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
 
   const fetchUsers = useCallback(async () => {
@@ -74,21 +76,26 @@ export default function ProfilePage() {
   }, [router, fetchUsers])
 
   const handleAddUser = async () => {
-    if (!newUser.nickname.trim()) return
+    if (!newUser.nickname.trim() || isSubmitting) return
 
-    const { error } = await supabase.from('users').insert({
-      nickname: newUser.nickname,
-      role: newUser.role,
-      password_hash: '',
-      is_first_login: true,
-    })
+    setIsSubmitting(true)
+    try {
+      const { error } = await supabase.from('users').insert({
+        nickname: newUser.nickname,
+        role: newUser.role,
+        password_hash: '',
+        is_first_login: true,
+      })
 
-    if (!error) {
-      setAddUserDialogOpen(false)
-      setNewUser({ nickname: '', role: 'diner' })
-      fetchUsers()
-    } else {
-      alert('创建失败，昵称可能已存在')
+      if (!error) {
+        setAddUserDialogOpen(false)
+        setNewUser({ nickname: '', role: 'diner' })
+        fetchUsers()
+      } else {
+        alert('创建失败，昵称可能已存在')
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -328,15 +335,19 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setAddUserDialogOpen(false)}>
+            <Button variant="outline" className="flex-1" onClick={() => setAddUserDialogOpen(false)} disabled={isSubmitting}>
               取消
             </Button>
             <Button 
               className="flex-1 bg-primary" 
               onClick={handleAddUser}
-              disabled={!newUser.nickname.trim()}
+              disabled={!newUser.nickname.trim() || isSubmitting}
             >
-              添加用户
+              {isSubmitting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> 添加中...</>
+              ) : (
+                '添加用户'
+              )}
             </Button>
           </div>
         </DialogContent>

@@ -63,6 +63,8 @@ export default function DinnerDetailPage() {
   })
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' })
   const [showOnlyOrdered, setShowOnlyOrdered] = useState(false)
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+  const [isUpdatingDinner, setIsUpdatingDinner] = useState(false)
 
   const fetchData = useCallback(async () => {
     // 获取饭局信息
@@ -190,34 +192,44 @@ export default function DinnerDetailPage() {
   }
 
   const handleUpdateDinner = async () => {
-    if (!dinner) return
+    if (!dinner || isUpdatingDinner) return
 
-    await supabase
-      .from('dinners')
-      .update({
-        title: editedDinner.title,
-        dining_time: toISOStringWithTimezone(editedDinner.diningTime),
-        order_deadline: toISOStringWithTimezone(editedDinner.orderDeadline),
-      })
-      .eq('id', dinnerId)
+    setIsUpdatingDinner(true)
+    try {
+      await supabase
+        .from('dinners')
+        .update({
+          title: editedDinner.title,
+          dining_time: toISOStringWithTimezone(editedDinner.diningTime),
+          order_deadline: toISOStringWithTimezone(editedDinner.orderDeadline),
+        })
+        .eq('id', dinnerId)
 
-    setEditDialogOpen(false)
-    fetchData()
+      setEditDialogOpen(false)
+      fetchData()
+    } finally {
+      setIsUpdatingDinner(false)
+    }
   }
 
   const handleSubmitReview = async () => {
-    if (!user) return
+    if (!user || isSubmittingReview) return
 
-    await supabase.from('reviews').insert({
-      dinner_id: dinnerId,
-      user_id: user.id,
-      rating: newReview.rating,
-      comment: newReview.comment,
-    })
+    setIsSubmittingReview(true)
+    try {
+      await supabase.from('reviews').insert({
+        dinner_id: dinnerId,
+        user_id: user.id,
+        rating: newReview.rating,
+        comment: newReview.comment,
+      })
 
-    setReviewDialogOpen(false)
-    setNewReview({ rating: 5, comment: '' })
-    fetchData()
+      setReviewDialogOpen(false)
+      setNewReview({ rating: 5, comment: '' })
+      fetchData()
+    } finally {
+      setIsSubmittingReview(false)
+    }
   }
 
   const hasReviewed = () => {
@@ -501,11 +513,15 @@ export default function DinnerDetailPage() {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>
+            <Button variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)} disabled={isUpdatingDinner}>
               取消
             </Button>
-            <Button className="flex-1 bg-primary" onClick={handleUpdateDinner}>
-              保存
+            <Button className="flex-1 bg-primary" onClick={handleUpdateDinner} disabled={isUpdatingDinner}>
+              {isUpdatingDinner ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> 保存中...</>
+              ) : (
+                '保存'
+              )}
             </Button>
           </div>
         </DialogContent>
@@ -552,11 +568,15 @@ export default function DinnerDetailPage() {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setReviewDialogOpen(false)}>
+            <Button variant="outline" className="flex-1" onClick={() => setReviewDialogOpen(false)} disabled={isSubmittingReview}>
               取消
             </Button>
-            <Button className="flex-1 bg-primary" onClick={handleSubmitReview}>
-              提交评价
+            <Button className="flex-1 bg-primary" onClick={handleSubmitReview} disabled={isSubmittingReview}>
+              {isSubmittingReview ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> 提交中...</>
+              ) : (
+                '提交评价'
+              )}
             </Button>
           </div>
         </DialogContent>

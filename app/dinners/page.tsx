@@ -14,7 +14,8 @@ import {
   Calendar, 
   Clock,
   ChevronRight,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -37,6 +38,7 @@ export default function DinnersPage() {
     diningTime: '',
     orderDeadline: ''
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
 
   const fetchDinners = useCallback(async () => {
@@ -68,21 +70,26 @@ export default function DinnersPage() {
   }, [router, fetchDinners])
 
   const handleAddDinner = async () => {
-    if (!user || !newDinner.title.trim() || !newDinner.diningTime || !newDinner.orderDeadline) return
+    if (!user || !newDinner.title.trim() || !newDinner.diningTime || !newDinner.orderDeadline || isSubmitting) return
 
-    const { error } = await supabase.from('dinners').insert({
-      title: newDinner.title,
-      dining_time: toISOStringWithTimezone(newDinner.diningTime),
-      order_deadline: toISOStringWithTimezone(newDinner.orderDeadline),
-      allow_modify: true,
-      created_by: user.id,
-      status: 'active',
-    })
+    setIsSubmitting(true)
+    try {
+      const { error } = await supabase.from('dinners').insert({
+        title: newDinner.title,
+        dining_time: toISOStringWithTimezone(newDinner.diningTime),
+        order_deadline: toISOStringWithTimezone(newDinner.orderDeadline),
+        allow_modify: true,
+        created_by: user.id,
+        status: 'active',
+      })
 
-    if (!error) {
-      setAddDialogOpen(false)
-      setNewDinner({ title: '', diningTime: '', orderDeadline: '' })
-      fetchDinners()
+      if (!error) {
+        setAddDialogOpen(false)
+        setNewDinner({ title: '', diningTime: '', orderDeadline: '' })
+        fetchDinners()
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -264,15 +271,19 @@ export default function DinnersPage() {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setAddDialogOpen(false)}>
+            <Button variant="outline" className="flex-1" onClick={() => setAddDialogOpen(false)} disabled={isSubmitting}>
               取消
             </Button>
             <Button 
               className="flex-1 bg-primary" 
               onClick={handleAddDinner}
-              disabled={!newDinner.title.trim() || !newDinner.diningTime || !newDinner.orderDeadline}
+              disabled={!newDinner.title.trim() || !newDinner.diningTime || !newDinner.orderDeadline || isSubmitting}
             >
-              创建饭局
+              {isSubmitting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> 创建中...</>
+              ) : (
+                '创建饭局'
+              )}
             </Button>
           </div>
         </DialogContent>
