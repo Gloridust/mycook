@@ -6,7 +6,17 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LazyImage } from '@/components/lazy-image'
-import { supabase, type Dish, type Dinner, type User, type Order, type Review } from '@/lib/supabase'
+import { supabase, type Dinner, type User, type Order, type Review } from '@/lib/supabase'
+
+/** Dish metadata without images - fetched lightweight for fast page load */
+type DishMeta = {
+  id: string
+  title: string
+  description: string | null
+  status: 'active' | 'inactive'
+  created_by: string
+  created_at: string
+}
 import { verifyToken } from '@/lib/auth'
 import {
   ArrowLeft,
@@ -50,7 +60,7 @@ export default function DinnerDetailPage() {
   const dinnerId = params.id as string
 
   const [dinner, setDinner] = useState<Dinner | null>(null)
-  const [dishes, setDishes] = useState<Dish[]>([])
+  const [dishes, setDishes] = useState<DishMeta[]>([])
   const [orders, setOrders] = useState<OrderWithUser[]>([])
   const [reviews, setReviews] = useState<ReviewWithUser[]>([])
   const [user, setUser] = useState<User | null>(null)
@@ -72,7 +82,7 @@ export default function DinnerDetailPage() {
     // Parallel data fetching for better performance
     const [dinnerRes, dishesRes, ordersRes, reviewsRes] = await Promise.all([
       supabase.from('dinners').select('*').eq('id', dinnerId).single(),
-      supabase.from('dishes').select('*').eq('status', 'active').order('created_at', { ascending: false }),
+      supabase.from('dishes').select('id, title, description, status, created_by, created_at').eq('status', 'active').order('created_at', { ascending: false }),
       supabase.from('orders').select('*, user:users(nickname)').eq('dinner_id', dinnerId),
       supabase.from('reviews').select('*, user:users(nickname)').eq('dinner_id', dinnerId).order('created_at', { ascending: false }),
     ])
@@ -346,15 +356,14 @@ export default function DinnerDetailPage() {
                         ordered ? 'ring-1.5 ring-primary/60 shadow-sm' : 'shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
                       }`}
                     >
-                      {/* Thumbnail */}
+                      {/* Thumbnail - image fetched on scroll */}
                       <div className="shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-muted">
-                        {dish.images && dish.images.length > 0 ? (
-                          <LazyImage src={dish.images[0]} alt={dish.title} className="w-full h-full" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ChefHat className="w-5 h-5 text-muted-foreground/30" />
-                          </div>
-                        )}
+                        <LazyImage
+                          dishId={dish.id}
+                          alt={dish.title}
+                          className="w-full h-full"
+                          fallback={<ChefHat className="w-5 h-5 text-muted-foreground/30" />}
+                        />
                       </div>
 
                       {/* Info */}

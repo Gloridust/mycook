@@ -4,8 +4,18 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { LazyImage } from '@/components/lazy-image'
-import { supabase, type Dish, type User } from '@/lib/supabase'
+import { LazyImage, invalidateDishImageCache } from '@/components/lazy-image'
+import { supabase, type User } from '@/lib/supabase'
+
+/** Dish metadata without images - fetched lightweight for fast page load */
+type DishMeta = {
+  id: string
+  title: string
+  description: string | null
+  status: 'active' | 'inactive'
+  created_by: string
+  created_at: string
+}
 import { verifyToken } from '@/lib/auth'
 import {
   ArrowLeft,
@@ -102,7 +112,7 @@ async function compressImage(file: File, maxSizeKB: number = 256): Promise<strin
 }
 
 export default function DishesPage() {
-  const [dishes, setDishes] = useState<Dish[]>([])
+  const [dishes, setDishes] = useState<DishMeta[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -115,7 +125,7 @@ export default function DishesPage() {
   const fetchDishes = useCallback(async () => {
     const { data } = await supabase
       .from('dishes')
-      .select('*')
+      .select('id, title, description, status, created_by, created_at')
       .order('created_at', { ascending: false })
 
     setDishes(data || [])
@@ -201,7 +211,7 @@ export default function DishesPage() {
     }
   }
 
-  const handleToggleStatus = async (dish: Dish) => {
+  const handleToggleStatus = async (dish: DishMeta) => {
     const newStatus = dish.status === 'active' ? 'inactive' : 'active'
     const { error } = await supabase
       .from('dishes')
@@ -286,15 +296,14 @@ export default function DishesPage() {
                   dish.status === 'inactive' ? 'opacity-50 grayscale' : ''
                 }`}
               >
-                {/* Square image */}
+                {/* Square image - fetched on scroll */}
                 <div className="relative aspect-square bg-muted">
-                  {dish.images && dish.images.length > 0 ? (
-                    <LazyImage src={dish.images[0]} alt={dish.title} className="w-full h-full" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
-                    </div>
-                  )}
+                  <LazyImage
+                    dishId={dish.id}
+                    alt={dish.title}
+                    className="w-full h-full"
+                    fallback={<ImageIcon className="w-8 h-8 text-muted-foreground/30" />}
+                  />
 
                   {dish.status === 'inactive' && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -326,14 +335,6 @@ export default function DishesPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
-                  )}
-
-                  {dish.images.length > 1 && (
-                    <div className="absolute bottom-1.5 right-1.5">
-                      <Badge variant="secondary" className="bg-white/80 text-[10px] h-4 px-1">
-                        +{dish.images.length - 1}
-                      </Badge>
                     </div>
                   )}
                 </div>
