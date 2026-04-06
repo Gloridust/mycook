@@ -3,21 +3,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { supabase, type Dinner, type User } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
-import { 
-  ArrowLeft, 
-  Plus, 
-  UtensilsCrossed, 
-  Calendar, 
+import {
+  ArrowLeft,
+  Plus,
+  UtensilsCrossed,
+  Calendar,
   Clock,
   ChevronRight,
   Trash2,
   Loader2
 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   Dialog,
   DialogContent,
@@ -46,7 +44,7 @@ export default function DinnersPage() {
       .from('dinners')
       .select('*')
       .order('created_at', { ascending: false })
-    
+
     setDinners(data || [])
     setLoading(false)
   }, [])
@@ -57,14 +55,14 @@ export default function DinnersPage() {
       router.push('/')
       return
     }
-    
+
     const decoded = verifyToken(token)
     if (!decoded) {
       localStorage.removeItem('token')
       router.push('/')
       return
     }
-    
+
     setUser(decoded as User)
     fetchDinners()
   }, [router, fetchDinners])
@@ -106,13 +104,8 @@ export default function DinnersPage() {
     }
   }
 
-  const isOrderDeadlinePassed = (deadline: string) => {
-    return new Date(deadline) < new Date()
-  }
-
-  const isDiningTimePassed = (diningTime: string) => {
-    return new Date(diningTime) < new Date()
-  }
+  const isOrderDeadlinePassed = (deadline: string) => new Date(deadline) < new Date()
+  const isDiningTimePassed = (diningTime: string) => new Date(diningTime) < new Date()
 
   const isChef = user?.role === 'chef'
 
@@ -127,123 +120,111 @@ export default function DinnersPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center justify-between p-4 max-w-4xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
-              <ArrowLeft className="w-5 h-5" />
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border">
+        <div className="flex items-center justify-between px-3 py-2.5 max-w-3xl mx-auto">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/')}>
+              <ArrowLeft className="w-4 h-4" />
             </Button>
-            <div className="flex items-center gap-2">
-              <UtensilsCrossed className="w-6 h-6 text-primary" />
-              <h1 className="text-xl font-bold">饭局列表</h1>
+            <div className="flex items-center gap-1.5">
+              <UtensilsCrossed className="w-5 h-5 text-primary" />
+              <h1 className="text-base font-bold">饭局列表</h1>
             </div>
           </div>
-          
-          <Button onClick={() => setAddDialogOpen(true)} className="rounded-full">
-            <Plus className="w-4 h-4 mr-2" />
+
+          <Button onClick={() => setAddDialogOpen(true)} size="sm" className="rounded-full h-8 text-xs">
+            <Plus className="w-3.5 h-3.5 mr-1" />
             新建饭局
           </Button>
         </div>
       </header>
 
       {/* Dinners List */}
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-3 max-w-3xl mx-auto">
         {dinners.length === 0 ? (
           <div className="text-center py-20">
-            <UtensilsCrossed className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
-            <p className="text-muted-foreground">还没有饭局</p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
+            <UtensilsCrossed className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">还没有饭局</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
               onClick={() => setAddDialogOpen(true)}
             >
               创建第一个饭局
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            <AnimatePresence>
-              {dinners.map((dinner) => {
-                const deadlinePassed = isOrderDeadlinePassed(dinner.order_deadline)
-                const diningPassed = isDiningTimePassed(dinner.dining_time)
-                
-                return (
-                  <motion.div
-                    key={dinner.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Card 
-                      className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => router.push(`/dinners/${dinner.id}`)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-semibold text-lg">{dinner.title}</h3>
-                              {deadlinePassed && !diningPassed && (
-                                <Badge variant="secondary">截止点菜</Badge>
-                              )}
-                              {diningPassed && (
-                                <Badge variant="outline">已结束</Badge>
-                              )}
-                              {!deadlinePassed && !diningPassed && (
-                                <Badge className="bg-primary/10 text-primary hover:bg-primary/20">进行中</Badge>
-                              )}
-                            </div>
-                            
-                            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="w-4 h-4" />
-                                <span>用餐：{format(dinner.dining_time, 'MM月dd日 HH:mm')}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-4 h-4" />
-                                <span>截止：{format(dinner.order_deadline, 'MM月dd日 HH:mm')}</span>
-                              </div>
-                            </div>
-                          </div>
+          <div className="space-y-2">
+            {dinners.map((dinner) => {
+              const deadlinePassed = isOrderDeadlinePassed(dinner.order_deadline)
+              const diningPassed = isDiningTimePassed(dinner.dining_time)
 
-                          <div className="flex items-center gap-2">
-                            {isChef && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteDinner(dinner.id)
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )
-              })}
-            </AnimatePresence>
+              return (
+                <div
+                  key={dinner.id}
+                  className="bg-card rounded-xl p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)] active:scale-[0.99] transition-transform cursor-pointer"
+                  onClick={() => router.push(`/dinners/${dinner.id}`)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <h3 className="font-semibold text-sm truncate">{dinner.title}</h3>
+                        {diningPassed ? (
+                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 shrink-0">已结束</Badge>
+                        ) : deadlinePassed ? (
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 shrink-0">已截止</Badge>
+                        ) : (
+                          <Badge className="bg-primary/10 text-primary hover:bg-primary/20 text-[10px] h-4 px-1.5 shrink-0">进行中</Badge>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          用餐 {format(dinner.dining_time, 'MM月dd日 HH:mm')}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          截止 {format(dinner.order_deadline, 'MM月dd日 HH:mm')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      {isChef && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteDinner(dinner.id)
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </main>
 
       {/* Add Dinner Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>新建饭局</DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>饭局名称</Label>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">饭局名称</Label>
               <Input
                 placeholder="例如：周末聚餐"
                 value={newDinner.title}
@@ -251,8 +232,8 @@ export default function DinnersPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>用餐时间</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">用餐时间</Label>
               <Input
                 type="datetime-local"
                 value={newDinner.diningTime}
@@ -260,8 +241,8 @@ export default function DinnersPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>点菜截止时间</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">点菜截止时间</Label>
               <Input
                 type="datetime-local"
                 value={newDinner.orderDeadline}
@@ -274,8 +255,8 @@ export default function DinnersPage() {
             <Button variant="outline" className="flex-1" onClick={() => setAddDialogOpen(false)} disabled={isSubmitting}>
               取消
             </Button>
-            <Button 
-              className="flex-1 bg-primary" 
+            <Button
+              className="flex-1 bg-primary"
               onClick={handleAddDinner}
               disabled={!newDinner.title.trim() || !newDinner.diningTime || !newDinner.orderDeadline || isSubmitting}
             >
